@@ -418,7 +418,7 @@ def export_csv(collection):
             message=f'{collection} with {doc_id_field} {doc_id} not found'
         ), 404
 
-    csv_str = export_func(result[0])
+    csv_str = export_func(result[0], db_client)
     return flask.Response(
         csv_str,
         mimetype='text/csv',
