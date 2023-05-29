@@ -1,33 +1,59 @@
+"""Functions for exporting documents to CSV.
+
+Export function names should be formatted as 'export_<document type>'.
+This is so that export functions can be retrieved via getattr().
+"""
+
 import pandas as pd
-import CRUD
 
 def product_convert_nested(product):
-    product['count'] = '' if product['count']['num'] < 0 else str(product['count']['num'])+product['count']['unit']
-    product['amount'] = str(product['amount']['measurement'])+product['amount']['unit'] 
+    """Converted count and amount fields to single value.
 
-def export_project(project):
-    query = {'upc': {'$in': project['products']}}
-    products = CRUD.client.get_products(query)
+    Args:
+      product: Original product document.
+    """
+    product['count'] = ('' if product['count']['num'] < 0 else
+                        f"{product['count']['num']}{product['count']['unit']}")
+    product['amount'] = (f"{product['amount']['measurement']}" +
+                         {product['amount']['unit']})
 
+def export_project(project, db_client):
+    """Export project to CSV.
+
+    Args:
+      project: Project to export.
+      db_client: Client for database operations.
+
+    Returns:
+      CSV as a string.
+    """
+    products = db_client.products_get({'upc': {'$in': project['products']}})
     drc_upc = []
     for product in products:
         product_convert_nested(product)
         if product['drc_upc'] != '':
             drc_upc.append(product['drc_upc'])
 
-    query = {'upc': {'$in': drc_upc}}
-    drc = CRUD.client.get_products(query)
-
+    drc = db_client.products_get({'upc': {'$in': drc_upc}})
     for product in drc:
         product_convert_nested(product)
-
     products += drc
 
     df = pd.DataFrame(products)
     return df.to_csv(index=False)
 
-def export_category(category):
-    query = {'name': {'$in': category['templates']}}
-    templates = CRUD.client.get_templates(query)
+def export_category(category, db_client):
+    """Export category to CSV.
+
+    Args:
+      category: Category to export.
+      db_client: Client for database operations.
+
+    Returns:
+      CSV as a string.
+    """
+    templates = db_client.templates_get(
+        {'name': {'$in': category['templates']}}
+    )
     df = pd.DataFrame(templates)
     return df.to_csv(index=False)
