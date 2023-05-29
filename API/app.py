@@ -124,6 +124,10 @@ def add_new_project():
     Project : JSON object
     """
     project = flask.request.get_json()
+    if db_client.check_duplicate(db_client.projects, {'name': project['name']}):
+        return flask.jsonify(
+            message=f"Project {project['name']} already exists."
+        ), 409
     return flask.jsonify(db_client.projects_add(project)), 200
 
 # Edit existing Project Protected API endpoint
@@ -143,9 +147,12 @@ def edit_project():
     (Will return None if nothing updated, or project not found by name)
     """
     project_data = flask.request.get_json()
-    updated_project = db_client.projects_update(project_data['name'],
-                                                project_data['products'])
-    return flask.jsonify(updated_project)
+    result = db_client.projects_update(
+        {'name': project_data['name']},
+        {'$set': {'products': project_data['products']}}
+    )
+    result = result[0] if result is not None else result
+    return flask.jsonify(result)
 
 # Delete existing Project Protected API endpoint
 @app.route('/projects/delete', methods = ['DELETE'])
@@ -162,7 +169,7 @@ def delete_project():
     data : JSON object
     """
     project_data = flask.request.get_json()
-    if db_client.projects_delete(project_data['name']):
+    if db_client.projects_delete({'name': project_data['project_name']}):
         #Seccessful Delete
         return flask.jsonify(data='Delete Sucessful'), 200
     #Failed Delete (No Content)
@@ -215,7 +222,10 @@ def add_new_product(project_name):
     """
     product_data = flask.request.get_json()
     if db_client.projects_get({'name': project_name}):
-        db_client.projects_update(project_name, product_data['upc'])
+        db_client.projects_update(
+            {'name': project_name},
+            {'$push': {'products': product_data['upc']}}
+        )
         new_product = db_client.products_add(product_data)
         return flask.jsonify(new_product), 200
     return flask.jsonify(
@@ -242,15 +252,19 @@ def edit_product(product_upc):
     if not updates:
         return flask.jsonify(message='No updates priveded'), 400
 
-    updated_product = db_client.products_update(
+    result = db_client.products_get({'upc': product_upc})
+    if not result:
+        return flask.jsonify(
+            message=f'Product with UPC {product_upc} not found'
+        ), 404
+    product = result[0]
+    result = db_client.products_update(
         {'upc': product_upc},
         {'$set': updates}
     )
-    if updated_product:
-        return flask.jsonify(updated_product), 200
-    return flask.jsonify(
-        message=f'Product with UPC {product_upc} not found'
-    ), 404
+    if result:
+        return flask.jsonify(result[0]), 200
+    return flask.jsonify(product), 200
 
 # Delete existing Product Protexted API endpoint
 @app.route('/products/delete', methods = ['DELETE'])
@@ -271,20 +285,24 @@ def delete_product_api():
     data : JSON Object
     """
     data = flask.request.get_json()
-    is_deleted = db_client.projects_update(
+    result = db_client.projects_update(
         {'name': data['project_name']},
         {'$pullAll': {'products': [data['product_upc']]}}
     )
-    if is_deleted:
+    if not result:
+        return flask.jsonify(
+            message=(f"Product with UPC {data['product_upc']} not found in "
+                     f"project {data['project_name']}")
+        ), 404
+
+    if db_client.products_delete({'upc': data['product_upc']}):
         return flask.jsonify(
             message=(f"Product with UPC {data['product_upc']} removed from "
                      f"project {data['project_name']}")
         ), 200
     return flask.jsonify(
-        message=(f"Product with UPC {data['product_upc']} not found in "
-                 f"project {data['project_name']}")
-    ), 404
-
+        message=f"Product {data['product_upc']} not found."
+    ), 400
 
 ##### Templates API Endpoints #####
 
@@ -344,20 +362,20 @@ def edit_template(template_name):
     updates = flask.request.get_json()
     if not updates:
         return flask.jsonify(message='No updates priveded'), 400
-    updated_template = db_client.templates_update(
+    result = db_client.templates_update(
         {'name': template_name},
         {'$set': updates}
     )
-    if updated_template:
-        return flask.jsonify(updated_template), 200
+    if result:
+        return flask.jsonify(result[0]), 200
     return flask.jsonify(
         message=f'Template with name {template_name} not found'
     ), 404
 
 # Delete existing Template Protected API endpoint
-@app.route('/templates/delete/<template_name>', methods = ['DELETE'])
+@app.route('/templates/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
-def delete_template(template_name):
+def delete_template():
     """Function to delete an existing template using the unique template name
 
     Parameter
@@ -368,9 +386,8 @@ def delete_template(template_name):
     ---------
     message : JSON Object
     """
-    del template_name
-    template_data = flask.request.json()
-    if db_client.templates_delete(template_data['template_name']):
+    template_data = flask.request.get_json()
+    if db_client.templates_delete({'name': template_data['template_name']}):
         #Seccessful Delete
         return flask.jsonify(data='Delete Sucessful'), 200
     #Failed Delete (No Content)
@@ -496,12 +513,12 @@ def edit_category(category_name):
     updates = flask.request.get_json()
     if not updates:
         return flask.jsonify(message='No updates priveded'), 400
-    updated_category = db_client.categories_update(
+    result = db_client.categories_update(
         {'name': category_name},
         {'$set': updates}
     )
-    if updated_category:
-        return flask.jsonify(updated_category), 200
+    if result:
+        return flask.jsonify(result[0]), 200
     return flask.jsonify(
         message=f'Category with name {category_name} not found'
     ), 404
@@ -602,12 +619,12 @@ def edit_user(username):
 
     if 'password' in updates:
         updates['password'] = auth.hash_password(updates['password'])
-    updated_user = db_client.users_update(
+    result = db_client.users_update(
         {'username': username},
         {'$set': updates}
     )
-    if updated_user:
-        return flask.jsonify(updated_user), 200
+    if result:
+        return flask.jsonify(result[0]), 200
     return flask.jsonify(
         message=f'User with username {username} not found'
     ), 404

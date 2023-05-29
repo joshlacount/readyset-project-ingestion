@@ -79,7 +79,7 @@ class DBClient:
             print('MongoDB user credentials are invalid')
         return False
 
-    def check_duplicate(self, col_name, query, existing=False):
+    def check_duplicate(self, collection, query, existing=False):
         """Checks if document with id is a duplicate.
 
         Args:
@@ -91,9 +91,6 @@ class DBClient:
         Returns:
           True if duplicates detected otherwise False.
         """
-        collection = getattr(self, col_name, None)
-        if collection is None:
-            return False
         n = len(list(collection.find(query)))
         return n > 1 if existing else n > 0
 
@@ -110,7 +107,7 @@ class DBClient:
         result = collection.insert_one(doc)
         return self._get(collection, {'_id': result.inserted_id})[0]
 
-    def _get(self, collection, query={}, projection={'_id': 0}):  # pylint: disable=dangerous-default-value
+    def _get(self, collection, query=None, projection=None):
         """Gets documents according to query.
 
         Args:
@@ -120,6 +117,10 @@ class DBClient:
         Returns:
           List of documents matching query.
         """
+        if query is None:
+            query = {}
+        if projection is None:
+            projection = {'_id': 0}
         return list(collection.find(query, projection))
 
     def _update(self, collection, query, update):
@@ -202,8 +203,7 @@ class DBClient:
         return self.users.find_one({'_id': result.inserted_id},
                                    {'_id': 0, 'password': 0})
 
-    def users_get(self, query={}, projection={'_id': 0},  # pylint: disable=dangerous-default-value
-                  include_password=False):
+    def users_get(self, query=None, projection=None, include_password=False):
         """Get users.
 
         Custom function with explicit option to include password in results.
@@ -216,6 +216,10 @@ class DBClient:
         Returns:
           List of user documents matching query.
         """
+        if query is None:
+            query = {}
+        if projection is None:
+            projection = {'_id': 0}
         if not include_password:
             projection['password'] = 0
         return list(self.users.find(query, projection))
@@ -233,5 +237,5 @@ class DBClient:
           List of updated documents.  None if no documents updated.
         """
         result = self.users.update_many(query, update)
-        return (self.users.find_many(query, {'_id': 0, 'password': 0})
+        return (self.users.find(query, {'_id': 0, 'password': 0})
                 if result.modified_count > 0 else None)
