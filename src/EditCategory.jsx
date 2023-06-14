@@ -29,7 +29,7 @@ export const EditCategory = (props) => {
             const temp = "{\"current_category\":\"" + props.stateVars + "\"}";
             console.log(temp);
             localStorage.setItem("current_category", temp);
-            fetch("https://ingestion-sandbox.dev.readysetvr.com/api/categories/get/" + props.stateVars, requestOptions)
+            fetch(process.env.API_BASE_URL+"/api/categories/get/" + props.stateVars, requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -64,7 +64,7 @@ export const EditCategory = (props) => {
             },
             redirect:"follow"
         }
-        fetch("https://ingestion-sandbox.dev.readysetvr.com/api/export/categories?id=" + props.stateVars + "&id_field=name", requestOptions)
+        fetch(process.env.API_BASE_URL+"/api/export/categories?id=" + props.stateVars + "&id_field=name", requestOptions)
             .then(response => {response.json()})
             .then(data => {console.log(data)})
         console.log("Export Category");   
@@ -88,7 +88,7 @@ export const EditCategory = (props) => {
             redirect:"follow"
         };
                 
-        fetch('https://ingestion-sandbox.dev.readysetvr.com/api/templates/delete/' + templateName, requestOptions)
+        fetch(process.env.API_BASE_URL+'/api/templates/delete/' + templateName, requestOptions)
           .then(response => {
             render();
           })
@@ -114,7 +114,7 @@ export const EditCategory = (props) => {
                 }),
                 redirect: "follow"
              }
-            fetch("https://ingestion-sandbox.dev.readysetvr.com/api/categories/add", requestOptions)
+            fetch(process.env.API_BASE_URL+"/api/categories/add", requestOptions)
                 .then(response => response.json())
                 .then(data => console.log(data))
         } else {
@@ -130,7 +130,7 @@ export const EditCategory = (props) => {
                 }),
                 redirect: "follow"
               }
-            fetch("https//ingestion-sandbox.dev.readysetvr.com/api/categories/edit/" + props.stateVars, requestOptions)
+            fetch(process.env.API_BASE_URL+"/api/categories/edit/" + props.stateVars, requestOptions)
                 .then(response => response.json())
                 .then(data => console.log(data))
         }
