@@ -79,7 +79,7 @@ export const EditTemplate = (props) => {
                 }),
                 redirect: "follow"
              }
-            return fetch("https://ingestion-sandbox.dev.readysetvr.com/api/templates/add", requestOptions)
+            return fetch(process.env.API_BASE_URL+"/api/templates/add", requestOptions)
                 .then(response => response.json())
                 .then(data => {
                     console.log("finished adding");
@@ -109,7 +109,7 @@ export const EditTemplate = (props) => {
                 }),
                 redirect: "follow"
               }
-            fetch("https//ingestion-sandbox.dev.readysetvr.com/api/templates/edit/" + props.stateVars, requestOptions)
+            fetch(process.env.API_BASE_URL+"/api/templates/edit/" + props.stateVars, requestOptions)
                 .then(response => {response.json()})
                 .then(data => {console.log(data)})
     }
@@ -140,7 +140,7 @@ export const EditTemplate = (props) => {
         if(props.stateVars === "Untitled") {
             clearRecord(); 
         } else {
-            const str = 'https://ingestion-sandbox.dev.readysetvr.com/api/templates/get/' + props.stateVars;
+            const str = process.env.API_BASE_URL+'/api/templates/get/' + props.stateVars;
             fetch(str, requestOptions)
               .then(response => response.json())
               .then(fetchData => {
@@ -175,7 +175,7 @@ export const EditTemplate = (props) => {
             redirect: "follow"  
         }
         
-        fetch("https://ingestion-sandbox.dev.readysetvr.com/api/categories/get/" + cat.current_category, requestOptions)
+        fetch(process.env.API_BASE_URL+"/api/categories/get/" + cat.current_category, requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     setData(fetchData.templates);

@@ -18,7 +18,7 @@ export const Category = (props) => {
             redirect: "follow"   
         };
                 
-        fetch("https://ingestion-sandbox.dev.readysetvr.com/api/categories/all", requestOptions)
+        fetch(process.env.API_BASE_URL+"/api/categories/all", requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -44,7 +44,7 @@ export const Category = (props) => {
                 headers: {"Authorization":token},
                 redirect: "follow"
              }
-            fetch("https://ingestion-sandbox.dev.readysetvr.com/api/categories/delete/"+categoryName, requestOptions)
+            fetch(process.env.API_BASE_URL+"/api/categories/delete/"+categoryName, requestOptions)
                 .then(response => response.json())
                 .then(data => console.log(data))
         render();

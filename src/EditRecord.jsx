@@ -45,7 +45,7 @@ export const EditRecord = (props) => {
         if(props.stateVars === "new record") {
             clearRecord(); 
         } else {
-            const str = 'https://ingestion-sandbox.dev.readysetvr.com/api/products/get/' + props.stateVars;
+            const str = process.env.API_BASE_URL+'/api/products/get/' + props.stateVars;
             fetch(str, requestOptions)
               .then(response => response.json())
               .then(fetchData => {
@@ -102,7 +102,7 @@ export const EditRecord = (props) => {
             },
             redirect: "follow"
         };
-        fetch("https://ingestion-sandbox.dev.readysetvr.com/api/categories/get/" + "Default", requestOptions)
+        fetch(process.env.API_BASE_URL+"/api/categories/get/" + "Default", requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     var updated_data = fetchData.templates;
@@ -166,7 +166,7 @@ export const EditRecord = (props) => {
             const project = JSON.parse(localStorage.getItem("current_project"))
             const projectName = project.current_project;
             console.log(projectName);
-            fetch('https://ingestion-sandbox.dev.readysetvr.com/api/products/add/' + projectName, requestOptions)
+            fetch(process.env.API_BASE_URL+'/api/products/add/' + projectName, requestOptions)
             .then(response => {
                 response.json()
             })
@@ -184,7 +184,7 @@ export const EditRecord = (props) => {
                 body: JSON.stringify(product),
                 redirect: "follow"
             };
-            fetch('https://ingestion-sandbox.dev.readysetvr.com/api/products/edit/' + upc, requestOptions)
+            fetch(process.env.API_BASE_URL+'/api/products/edit/' + upc, requestOptions)
                 .then(response => {
                     response.json()
             })
@@ -215,7 +215,7 @@ export const EditRecord = (props) => {
                     }),
                     redirect: "follow"
                  }
-                fetch("https://ingestion-sandbox.dev.readysetvr.com/api/templates/add", requestOptions)
+                fetch(process.env.API_BASE_URL+"/api/templates/add", requestOptions)
                     .then(response => response.json())
                     .then(data => {
                         console.log("finished adding to db");

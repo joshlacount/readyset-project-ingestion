@@ -9,7 +9,7 @@ export const Login = (props) => {
     const changeTheme = (newTheme) => {
         console.log("changed theme");
         setTheme(newTheme);
-    }
+    };
 
     const handleSubmit = (e) => {
       var myHeaders = new Headers();
@@ -27,7 +27,7 @@ export const Login = (props) => {
         redirect: 'follow'
       };
       var result_text = "";
-      fetch("https://ingestion-sandbox.dev.readysetvr.com/api/login", requestOptions)
+      fetch(process.env.API_BASE_URL+"/api/login", requestOptions)
       .then(response => response.text())
       .then(result => {
         if(result.includes("error")) {

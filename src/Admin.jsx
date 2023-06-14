@@ -18,7 +18,7 @@ export const Admin = (props) => {
             redirect: "follow"   
         };
                 
-        fetch("https://ingestion-sandbox.dev.readysetvr.com/api/users/all", requestOptions)
+        fetch(process.env.API_BASE_URL+"/api/users/all", requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -68,7 +68,7 @@ export const Admin = (props) => {
             redirect:"follow"
         };
                 
-        fetch('https://ingestion-sandbox.dev.readysetvr.com/api/users/delete/' + item, requestOptions)
+        fetch(process.env.API_BASE_URL+'/api/users/delete/' + item, requestOptions)
           .then(response => {
             render();
           })

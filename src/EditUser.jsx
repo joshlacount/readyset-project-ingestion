@@ -22,7 +22,7 @@ export const EditUser = (props) => {
         if(props.stateVars === "Untitled") {
           setUsername("Untitled"); 
         } else {
-          fetch("https://ingestion-sandbox.dev.readysetvr.com/api/users/get/" + props.stateVars, requestOptions)
+          fetch(process.env.API_BASE_URL+"/api/users/get/" + props.stateVars, requestOptions)
                   .then(response => response.json())
                   .then(fetchData => {
                       if(mounted) {
@@ -66,7 +66,7 @@ export const EditUser = (props) => {
             redirect: "follow"   
         };
       
-         fetch('https://ingestion-sandbox.dev.readysetvr.com/api/users/add', requestOptions)
+         fetch(process.env.API_BASE_URL+'/api/users/add', requestOptions)
             .then(response => {
                 response.json()
             })
