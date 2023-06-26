@@ -5,9 +5,10 @@ common low-level operations.
 """
 
 import pymongo
-from pymongo import errors
+from pymongo import errors as pmerrors
 from urllib import parse
 import itertools
+import errors
 
 # Database and collection names
 _DB = 'pi'
@@ -64,7 +65,7 @@ class DBClient:
                 base_func = getattr(self, f'_{op}')
                 setattr(self, func_name, gen_lambda(base_func, collection))
 
-    def check_connection(self):
+    def can_connect(self):
         """Checks if connection to the database can be established.
 
         Returns:
@@ -73,13 +74,13 @@ class DBClient:
         try:
             self.client.admin.command('ping')
             return True
-        except errors.ConnectionFailure:
-            print('Failed to connect to MongoDB server')
-        except errors.ConfigurationError:
-            print('MongoDB user credentials are invalid')
+        except pmerrors.ServerSelectionError:
+            print('Unable to find MongoDB server.  Check address.')
+        except pmerrors.PyMongoError as e:
+            print(f'Error connecting to MongoDB server - {e.message}')
         return False
 
-    def check_duplicate(self, collection, query, existing=False):
+    def is_duplicate(self, collection, query, existing=False):
         """Checks if document with id is a duplicate.
 
         Args:
@@ -91,7 +92,11 @@ class DBClient:
         Returns:
           True if duplicates detected otherwise False.
         """
-        n = len(list(collection.find(query)))
+        try:
+            result = collection.find(query)
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e
+        n = len(list(result))
         return n > 1 if existing else n > 0
 
     def _add(self, collection, doc):
@@ -104,7 +109,10 @@ class DBClient:
         Returns:
           The inserted document.
         """
-        result = collection.insert_one(doc)
+        try:
+            result = collection.insert_one(doc)
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e
         return self._get(collection, {'_id': result.inserted_id})[0]
 
     def _get(self, collection, query=None, projection=None):
@@ -121,7 +129,11 @@ class DBClient:
             query = {}
         if projection is None:
             projection = {'_id': 0}
-        return list(collection.find(query, projection))
+        try:
+            result = collection.find(query, projection)
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e 
+        return list(result)
 
     def _update(self, collection, query, update):
         """Updates documents.
@@ -133,7 +145,10 @@ class DBClient:
         Returns:
           List of updated documents.  None if no documents updated.
         """
-        result = collection.update_many(query, update)
+        try:
+            result = collection.update_many(query, update)    
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e
         return (self._get(collection, query)
                 if result.modified_count > 0 else None)
 
@@ -146,7 +161,10 @@ class DBClient:
         Returns:
           True if deleted count > 0 otherwise False.
         """
-        return collection.delete_many(query).deleted_count > 0
+        try:
+            return collection.delete_many(query).deleted_count > 0
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e
 
     def templates_delete(self, query):
         """Deletes templates according to query.
@@ -162,10 +180,14 @@ class DBClient:
         """
         to_be_deleted = [template['name'] for template in
                          self.templates_get(query, {'name': 1})]
-        self.categories_update({'templates': {'$all': to_be_deleted}},
-                               {'$pullAll': {'templates': to_be_deleted}})
-        self.products_update({'template_name': {'$in': to_be_deleted}},
-                             {'$set': {'template_name': ''}})
+        self.categories_update(
+            {'templates': {'$all': to_be_deleted}},
+            {'$pullAll': {'templates': to_be_deleted}}
+        )
+        self.products_update(
+            {'template_name': {'$in': to_be_deleted}},
+            {'$set': {'template_name': ''}}
+        )
         return self._delete(self.templates, query)
 
     def categories_delete(self, query):
@@ -184,8 +206,10 @@ class DBClient:
             *[category['templates'] for category in
               self.categories_get(query)]
         ))
-        self.categories_update({'name': 'Default'},
-                               {'$push': {'templates': {'$each': templates}}})
+        self.categories_update(
+            {'name': 'Default'},
+            {'$push': {'templates': {'$each': templates}}}
+        )
         return self._delete(self.categories, query)
 
     def users_add(self, user):
@@ -199,9 +223,14 @@ class DBClient:
         Returns:
           The inserted user document.
         """
-        result = self.users.insert_one(user)
-        return self.users.find_one({'_id': result.inserted_id},
-                                   {'_id': 0, 'password': 0})
+        try:
+            result = self.users.insert_one(user)
+            return self.users.find_one(
+                {'_id': result.inserted_id},
+                {'_id': 0, 'password': 0}
+            )
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e
 
     def users_get(self, query=None, projection=None, include_password=False):
         """Get users.
@@ -222,7 +251,10 @@ class DBClient:
             projection = {'_id': 0}
         if not include_password:
             projection['password'] = 0
-        return list(self.users.find(query, projection))
+        try:
+            return list(self.users.find(query, projection))
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e
 
     def users_update(self, query, update):
         """Update user.
@@ -236,6 +268,9 @@ class DBClient:
         Returns:
           List of updated documents.  None if no documents updated.
         """
-        result = self.users.update_many(query, update)
-        return (self.users.find(query, {'_id': 0, 'password': 0})
-                if result.modified_count > 0 else None)
+        try:
+            result = self.users.update_many(query, update)
+            return (self.users.find(query, {'_id': 0, 'password': 0})
+                    if result.modified_count > 0 else None)
+        except pmerrors.PyMongoError as e:
+            raise errors.DatabaseError(e.message) from e

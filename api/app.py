@@ -4,9 +4,20 @@ import os
 import sys
 import flask
 import flask_jwt_extended
+import json
+import jsonschema
+from jsonschema import exceptions
 import db
 import export
 import auth
+import errors
+
+def validate_json(json, schema):
+    try:
+        jsonschema.Draft202012Validator(schema).validate(json)
+    except exceptions.ValidationError as err:
+        return err.message
+
 
 # Init the Dependencies and API, the code is kinda messy up here.
 #
@@ -15,6 +26,9 @@ import auth
 # The DOCString Comments are an idea for what the functions will end up doing
 # (some are not fully flushed yet because of ambiguity).
 #
+
+with open(os.environ.get('SCHEMA_PATH'), 'r') as f:
+    schema = json.load(f)
 
 app = flask.Flask(__name__)
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_KEY')
@@ -27,7 +41,7 @@ db_password = os.environ.get('DB_PASSWORD')
 db_auth_source = os.environ.get('DB_AUTH_SOURCE')
 db_client = db.DBClient(db_address, db_port, db_username, db_password,
                         db_auth_source)
-if not db_client.check_connection():
+if not db_client.can_connect():
     print('Unable to connect to database!')
     sys.exit(1)
 
@@ -65,15 +79,21 @@ def login():
     password = flask.request.json.get('password', None)
 
     if None in [username, password]:
-        return flask.jsonify(error='Missing username or password'), 400
+        return flask.jsonify(error='Missing username and/or password'), 400
 
-    result = db_client.users_get({'username': username}, include_password=True)
+    try:
+        result = db_client.users_get(
+            {'username': username},
+            include_password=True
+        )
+    except errors.DatabaseError as e:
+        print(f'Database error! -- {str(e)}')
+        return flask.jsonify(error='Database operation failed'), 500
     if (not result or password is None or
         not auth.verify_password(password, result[0]['password'])):
         return flask.jsonify(error='Invalid username or password'), 401
     access_token = flask_jwt_extended.create_access_token(identity=username)
     return flask.jsonify(access_token=access_token), 200
-
 
 @app.route('/testjwt', methods=['GET'])
 @flask_jwt_extended.jwt_required()
@@ -82,9 +102,9 @@ def test_jwt():
 
 ##### Projects API Endpoints #####
 
-@app.route('/projects/get/<project_name>', methods=['GET'])
+@app.route('/projects/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
-def get_project(project_name):
+def get_project():
     """Base Function to Retrieve the Project from the MongoDB database using
     the project name as an ID
 
@@ -96,22 +116,37 @@ def get_project(project_name):
     ---------
     Project : JSON Object
     """
-    result = db_client.projects_get({'name': project_name})
+
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['get_project']):
+        return flask.jsonify(error=err), 400
+
+    try:
+        result = db_client.projects_get({'name': json['name']})
+    except errors.DatabaseError as e:
+        print(f'Database error! -- {str(e)}')
+        return flask.jsonify(error='Database operation failed'), 500
     if len(result) > 0:
         return flask.jsonify(result[0]), 200
-    return flask.jsonify(message=f'Project {project_name} not found.'), 400
+    return flask.jsonify(
+        message=f"Project {json['name']} not found."
+    ), 400
 
 # Protected API endpoint, List all Projects
 @app.route('/projects/all', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def list_projects():
-    projects = db_client.projects_get()
+    try:
+        projects = db_client.projects_get()
+    except errors.DatabaseError as e:
+        print(f'Database error! -- {str(e)}')
+        return flask.jsonify(error='Database operation failed'), 500
     return flask.jsonify(projects), 200
 
 # Create new Project Protected API endpoint
 @app.route('/projects/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
-def add_new_project():
+def add_project():
     """
     Function to add a blank project to the database.
     Parameter
@@ -123,12 +158,23 @@ def add_new_project():
     ---------
     Project : JSON object
     """
-    project = flask.request.get_json()
-    if db_client.check_duplicate(db_client.projects, {'name': project['name']}):
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['collections']['projects']):
+        return flask.jsonify(error=err), 400
+
+    try:
+        dup = db_client.is_duplicate(
+            db_client.projects,
+            {'name': json['name']}
+        )
+    except errors.DatabaseError as e:
+        print(f'Database error! -- {str(e)}')
+        return flask.jsonify(error='Database operation failed'), 500
+    if dup:
         return flask.jsonify(
-            message=f"Project {project['name']} already exists."
+            message=f"Project {json['name']} already exists."
         ), 409
-    return flask.jsonify(db_client.projects_add(project)), 200
+    return flask.jsonify(db_client.projects_add(json)), 200
 
 # Edit existing Project Protected API endpoint
 @app.route('/projects/edit', methods = ['PUT'])
@@ -146,11 +192,18 @@ def edit_project():
     Project : JSON object
     (Will return None if nothing updated, or project not found by name)
     """
-    project_data = flask.request.get_json()
-    result = db_client.projects_update(
-        {'name': project_data['name']},
-        {'$set': {'products': project_data['products']}}
-    )
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['edit_project']):
+        return flask.jsonify(error=err), 400
+
+    try:
+        result = db_client.projects_update(
+            {'name': json['name']},
+            {'$set': {'products': json['products']}}
+        )
+    except errors.DatabaseError as e:
+        print(f'Database error! -- {str(e)}')
+        return flask.jsonify(error='Database operation failed'), 500
     result = result[0] if result is not None else result
     return flask.jsonify(result)
 
@@ -168,23 +221,24 @@ def delete_project():
     ---------
     data : JSON object
     """
-    project_data = flask.request.get_json()
-    if db_client.projects_delete({'name': project_data['project_name']}):
-        #Seccessful Delete
-        return flask.jsonify(data='Delete Sucessful'), 200
-    #Failed Delete (No Content)
-    return flask.jsonify(
-        data=('Delete Operation failed on project: '
-              f"{project_data['project_name']}. 204 Status Code.")
-    ), 204
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['delete_project']):
+        return flask.jsonify(error=err), 400
 
+    try:
+        if db_client.projects_delete({'name': json['name']}):
+            return flask.jsonify(message='Delete Sucessful'), 200
+    except errors.DatabaseError as e:
+        print(f'Database error! -- {str(e)}')
+        return flask.jsonify(error='Database operation failed'), 500
+    return flask.jsonify(message='Project not found'), 404
 
 ##### Products API Endpoints #####
 
 # Retrieve product Protected API endpoint
-@app.route('/products/get/<product_upc>', methods=['GET'])
+@app.route('/products/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
-def get_product_data(product_upc):
+def get_product():
     """Function to Retrieve the product from the MongoDB database using the
     product name as an ID
 
@@ -196,19 +250,23 @@ def get_product_data(product_upc):
     ---------
     Product : JSON Object
     """
-    products = db_client.products_get({'upc': product_upc})
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['get_product']):
+        return flask.jsonify(error=err), 400
+    
+    products = db_client.products_get({'upc': json['upc']})
     if len(products) > 0:
         #Sucessful Product Fetch
         return flask.jsonify(products[0]), 200
     #Failed to Retrieve Data (Doesn't Exist)
     return flask.jsonify(
-        error=f'Error Fetching Product {product_upc}. Status Code: 204'
+        error=f"Error Fetching Product {json['upc']}. Status Code: 204"
     ), 204
 
 # Create new Product Protected API endpoint
-@app.route('/products/add/<project_name>', methods = ['POST'])
+@app.route('/products/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
-def add_new_product(project_name):
+def add_product():
     """Function to add a new product linked to a specified project
 
     Parameter
@@ -220,23 +278,25 @@ def add_new_product(project_name):
     ---------
     Project : JSON Object
     """
-    product_data = flask.request.get_json()
-    if db_client.projects_get({'name': project_name}):
+    json = flask.request.get_json()
+    if ((err := validate_json(json, schema['endpoints']['add_product']))
+        or (err := validate_json(json['product'],
+                                 schema['collections']['products']))):
+        return flask.jsonify(error=err), 400
+    
+    if db_client.projects_get({'name': json['project_name']}):
         db_client.projects_update(
-            {'name': project_name},
-            {'$push': {'products': product_data['upc']}}
+            {'name': json['project_name']},
+            {'$push': {'products': json['product']['upc']}}
         )
-        new_product = db_client.products_add(product_data)
+        new_product = db_client.products_add(json['product'])
         return flask.jsonify(new_product), 200
-    return flask.jsonify(
-        data=(f"Error when creating product {product_data['name']} "
-              f'in {project_name}. Status Code: 400')
-    ), 400
+    return flask.jsonify(error='Project not found'), 404
 
 # Edit existing Product Protected API endpoint
-@app.route('/products/edit/<product_upc>', methods = ['PUT'])
+@app.route('/products/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
-def edit_product(product_upc):
+def edit_product():
     """Function to edit a product based of the product name
 
     Parameter
@@ -248,28 +308,25 @@ def edit_product(product_upc):
     ---------
     Product : JSON Object
     """
-    updates = flask.request.get_json()
-    if not updates:
-        return flask.jsonify(message='No updates priveded'), 400
-
-    result = db_client.products_get({'upc': product_upc})
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['edit_product']):
+        return flask.jsonify(error=err), 400
+    
+    result = db_client.products_get({'upc': json['upc']})
     if not result:
-        return flask.jsonify(
-            message=f'Product with UPC {product_upc} not found'
-        ), 404
+        return flask.jsonify(error=f'Product not found'), 404
     product = result[0]
     result = db_client.products_update(
-        {'upc': product_upc},
-        {'$set': updates}
+        {'upc': json['upc']},
+        {'$set': json['updates']}
     )
-    if result:
-        return flask.jsonify(result[0]), 200
-    return flask.jsonify(product), 200
+    result = result[0] if result else product
+    return flask.jsonify(result), 200
 
 # Delete existing Product Protexted API endpoint
 @app.route('/products/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
-def delete_product_api():
+def delete_product():
     """Function to delete a product based of the products UPC
 
     Parameter
@@ -284,32 +341,26 @@ def delete_product_api():
     ---------
     data : JSON Object
     """
-    data = flask.request.get_json()
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['delete_product']):
+        return flask.jsonify(error=err), 400
+    
     result = db_client.projects_update(
-        {'name': data['project_name']},
-        {'$pullAll': {'products': [data['product_upc']]}}
+        {'name': json['project_name']},
+        {'$pullAll': {'products': [json['upc']]}}
     )
     if not result:
-        return flask.jsonify(
-            message=(f"Product with UPC {data['product_upc']} not found in "
-                     f"project {data['project_name']}")
-        ), 404
-
-    if db_client.products_delete({'upc': data['product_upc']}):
-        return flask.jsonify(
-            message=(f"Product with UPC {data['product_upc']} removed from "
-                     f"project {data['project_name']}")
-        ), 200
-    return flask.jsonify(
-        message=f"Product {data['product_upc']} not found."
-    ), 400
+        return flask.jsonify(error='Product not found in project'), 404
+    if db_client.products_delete({'upc': json['upc']}):
+        return flask.jsonify(message='Product deleted'), 200
+    return flask.jsonify(error='Product not found'), 404
 
 ##### Templates API Endpoints #####
 
 # Retrieve Template Protected API endpoint
-@app.route('/templates/get/<template_name>', methods=['GET'])
+@app.route('/templates/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
-def get_template_data(template_name):
+def get_template():
     """Function to fetch template data based on the unique template name
 
     Parameter
@@ -320,19 +371,19 @@ def get_template_data(template_name):
     ---------
     template : JSON Object
     """
-    result = db_client.templates_get({'name': template_name})
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['get_template']):
+        return flask.jsonify(error=err), 400
+    
+    result = db_client.templates_get({'name': json['name']})
     if result:
-        #Template was found in DB
         return flask.jsonify(result[0]), 200
-    #Template was not found in DB
-    return flask.jsonify(
-        message=f'Failed to Fetch Template: {template_name}.'
-    ), 404
+    return flask.jsonify(error='Template not found'), 404
 
 # Create new Template Protected API endpoint
 @app.route('/templates/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
-def add_new_template():
+def add_template():
     """Function to add a new blank template based on a template name
 
     Parameter
@@ -343,13 +394,16 @@ def add_new_template():
     ---------
     Template:  JSON Object
     """
-    template_data = flask.request.get_json()
-    return flask.jsonify(db_client.templates_add(template_data)), 200
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['collections']['templates']):
+        return flask.jsonify(error=err), 400
+
+    return flask.jsonify(db_client.templates_add(json)), 200
 
 # Edit existing Template Protected API endpoint
-@app.route('/templates/edit/<template_name>', methods = ['PUT'])
+@app.route('/templates/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
-def edit_template(template_name):
+def edit_template():
     """Function to edit an existing template using the unique template name
     Parameter
     ---------
@@ -359,12 +413,13 @@ def edit_template(template_name):
     ---------
     template : JSON Object
     """
-    updates = flask.request.get_json()
-    if not updates:
-        return flask.jsonify(message='No updates priveded'), 400
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['edit_template']):
+        return flask.jsonify(error=err), 400
+
     result = db_client.templates_update(
-        {'name': template_name},
-        {'$set': updates}
+        {'name': json['name']},
+        {'$set': json['updates']}
     )
     if result:
         return flask.jsonify(result[0]), 200
@@ -386,22 +441,20 @@ def delete_template():
     ---------
     message : JSON Object
     """
-    template_data = flask.request.get_json()
-    if db_client.templates_delete({'name': template_data['template_name']}):
-        #Seccessful Delete
-        return flask.jsonify(data='Delete Sucessful'), 200
-    #Failed Delete (No Content)
-    return flask.jsonify(
-        data=('Delete Operation failed on project: '
-              f"{template_data['template_name']}. 204 Status Code.")
-    ), 204
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['delete_template']):
+        return flask.jsonify(error=err), 400
+
+    if db_client.templates_delete({'name': json['name']}):
+        return flask.jsonify(message='Delete Sucessful'), 200
+    return flask.jsonify(error='Template not found'), 404
 
 ##### Export API Endpoints #####
 
 # Export document to CSV Protected API endpoint
-@app.route('/export/<collection>', methods = ['GET'])
+@app.route('/export', methods = ['GET'])
 @flask_jwt_extended.jwt_required()
-def export_csv(collection):
+def export_csv():
     """Function to export a document from a collection based on a unique ID
 
     Paramter
@@ -413,12 +466,13 @@ def export_csv(collection):
     csv : Response
     """
 
-    doc_id = flask.request.args.get('id')
-    if doc_id is None:
-        return flask.jsonify(message='Document ID not provided'), 400
-    doc_id_field = flask.request.args.get('id_field')
-    if doc_id_field is None:
-        return flask.jsonify(message='Document ID field is not provided'), 400
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['export_csv']):
+        return flask.jsonify(error=err), 400
+
+    doc_id = json['id']
+    doc_id_field = json['id_field']
+    collection = json['collection']
 
     if collection == 'project':
         get_doc_func = getattr(db_client, 'projects_get')
@@ -431,9 +485,7 @@ def export_csv(collection):
 
     result = get_doc_func({doc_id_field: doc_id})
     if not result:
-        return flask.jsonify(
-            message=f'{collection} with {doc_id_field} {doc_id} not found'
-        ), 404
+        return flask.jsonify(error='Document not found'), 404
 
     csv_str = export_func(result[0], db_client)
     return flask.Response(
@@ -448,9 +500,9 @@ def export_csv(collection):
 ##### Category API Endpoints #####
 
 # Protected API endpoint for, Get Category
-@app.route('/categories/get/<category_name>', methods=['GET'])
+@app.route('/categories/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
-def get_category_data(category_name):
+def get_category():
     """Base Function to Retrieve the Category from the MongoDB database using
     the category name as an ID
 
@@ -462,12 +514,14 @@ def get_category_data(category_name):
     ---------
     Category : JSON Object
     """
-    result = db_client.categories_get({'name': category_name})
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['get_category']):
+        return flask.jsonify(error=err), 400
+
+    result = db_client.categories_get({'name': json['name']})
     if result:
         return flask.jsonify(result[0]), 200
-    return flask.jsonify(
-        message=f'Category {category_name} not found.'
-    ), 400
+    return flask.jsonify(error=f'Category not found'), 404
 
 # Protected API endpoint, List all Categories
 @app.route('/categories/all', methods=['GET'])
@@ -479,7 +533,7 @@ def list_categories():
 # Create new Category Protected API endpoint
 @app.route('/categories/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
-def add_new_category():
+def add_category():
     """
     Function to add a new category to the database.
     Parameter
@@ -491,13 +545,16 @@ def add_new_category():
     ---------
     Category : JSON object
     """
-    category_data = flask.request.get_json()
-    return flask.jsonify(db_client.categories_add(category_data)), 200
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['collections']['categories']):
+        return flask.jsonify(error=err), 400
+
+    return flask.jsonify(db_client.categories_add(json)), 200
 
 # Edit existing Category Protected API endpoint
-@app.route('/categories/edit/<category_name>', methods = ['PUT'])
+@app.route('/categories/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
-def edit_category(category_name):
+def edit_category():
     """
     Function to edit an existing category in the database.
 
@@ -510,23 +567,22 @@ def edit_category(category_name):
     Category : JSON object
     (Will return false if nothing updated, or category not found by name)
     """
-    updates = flask.request.get_json()
-    if not updates:
-        return flask.jsonify(message='No updates priveded'), 400
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['edit_category']):
+        return flask.jsonify(error=err), 400
+
     result = db_client.categories_update(
-        {'name': category_name},
-        {'$set': updates}
+        {'name': json['name']},
+        {'$set': json['updates']}
     )
     if result:
         return flask.jsonify(result[0]), 200
-    return flask.jsonify(
-        message=f'Category with name {category_name} not found'
-    ), 404
+    return flask.jsonify(error=f'Category not found'), 404
 
 # Delete existing Category Protected API endpoint
-@app.route('/categories/delete/<category_name>', methods = ['DELETE'])
+@app.route('/categories/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
-def delete_category(category_name):
+def delete_category():
     """
     Function to delete an existing category in the database.
 
@@ -537,21 +593,20 @@ def delete_category(category_name):
     ---------
     data : JSON object
     """
-    if db_client.categories_delete({'name': category_name}):
-        #Seccessful Delete
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['delete_category']):
+        return flask.jsonify(error=err), 400
+
+    if db_client.categories_delete({'name': json['name']}):
         return flask.jsonify(data='Delete Sucessful'), 200
-    #Failed Delete (No Content)
-    return flask.jsonify(
-        data=(f'Delete Operation failed on category: {category_name}. '
-              '204 Status Code.')
-    ), 204
+    return flask.jsonify(error='Category not found'), 404
 
 ##### User API Endpoints #####
 
 # Protected API endpoint for, Get User
-@app.route('/users/get/<username>', methods=['GET'])
+@app.route('/users/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
-def get_user_data(username):
+def get_user():
     """Base Function to Retrieve the User from the MongoDB database using the
     username as an ID
 
@@ -563,10 +618,14 @@ def get_user_data(username):
     ---------
     User : JSON Object
     """
-    result = db_client.users_get({'username': username})
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['get_user']):
+        return flask.jsonify(error=err), 400
+
+    result = db_client.users_get({'username': json['username']})
     if result:
         return flask.jsonify(result[0]), 200
-    return flask.jsonify(message=f'User {username} not found.'), 400
+    return flask.jsonify(error=f'User not found'), 404
 
 # Protected API endpoint, List all Users
 @app.route('/users/all', methods=['GET'])
@@ -578,7 +637,7 @@ def list_users():
 # Create new User Protected API endpoint
 @app.route('/users/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
-def add_new_user():
+def add_user():
     """
     Function to add a new user to the database.
     Parameter
@@ -590,17 +649,17 @@ def add_new_user():
     ---------
     User : JSON object
     """
-    user_data = flask.request.get_json()
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['collections']['users']):
+        return flask.jsonify(error=err), 400
 
-    if 'username' in user_data and 'password' in user_data:
-        user_data['password'] = auth.hash_password(user_data['password'])
-        return flask.jsonify(db_client.users_add(user_data)), 200
-    return flask.jsonify(message='Required user info missing.'), 400
+    json['password'] = auth.hash_password(json['password'])
+    return flask.jsonify(db_client.users_add(json)), 200
 
 # Edit existing User Protected API endpoint
-@app.route('/users/edit/<username>', methods = ['PUT'])
+@app.route('/users/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
-def edit_user(username):
+def edit_user():
     """
     Function to edit an existing user in the database.
 
@@ -613,26 +672,26 @@ def edit_user(username):
     User : JSON object
     (Will return false if nothing updated, or user not found by username)
     """
-    updates = flask.request.get_json()
-    if not updates:
-        return flask.jsonify(message='No updates priveded'), 400
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['edit_user']):
+        return flask.jsonify(error=err), 400
 
-    if 'password' in updates:
-        updates['password'] = auth.hash_password(updates['password'])
+    if 'password' in json['updates']:
+        json['updates']['password'] = auth.hash_password(
+            json['updates']['password']
+        )
     result = db_client.users_update(
-        {'username': username},
-        {'$set': updates}
+        {'username': json['username']},
+        {'$set': json['updates']}
     )
     if result:
         return flask.jsonify(result[0]), 200
-    return flask.jsonify(
-        message=f'User with username {username} not found'
-    ), 404
+    return flask.jsonify(error='User not found'), 404
 
 # Delete existing User Protected API endpoint
-@app.route('/users/delete/<username>', methods = ['DELETE'])
+@app.route('/users/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
-def delete_user(username):
+def delete_user():
     """
     Function to delete an existing user in the database.
 
@@ -643,16 +702,16 @@ def delete_user(username):
     ---------
     data : JSON object
     """
-    if username == 'admin':
+    json = flask.request.get_json()
+    if err := validate_json(json, schema['endpoints']['delete_user']):
+        return flask.jsonify(error=err), 400
+
+    if json['username'] == 'admin':
         return flask.jsonify(message="Can't delete user admin."), 405
 
-    if db_client.users_delete({'username': username}):
-        #Seccessful Delete
+    if db_client.users_delete({'username': json['username']}):
         return flask.jsonify(data='Delete Sucessful'), 200
-    #Failed Delete (No Content)
-    return flask.jsonify(
-        data=f'Delete Operation failed on user: {username}. 204 Status Code.'
-    ), 204
+    return flask.jsonify(error='User not found'), 404
 
 
 if __name__ == '__main__':

@@ -1,0 +1,383 @@
+{
+    "endpoints": {
+        "get_project": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "edit_project": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "products"
+            ]
+        },
+        "delete_project": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "get_product": {
+            "type": "object",
+            "properties": {
+                "upc": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "upc"
+            ]
+        },
+        "add_product": {
+            "type": "object",
+            "properties": {
+                "project_name": {
+                    "type": "string"
+                },
+                "product": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "project_name",
+                "product"
+            ]
+        },
+        "edit_product": {
+            "type": "object",
+            "properties": {
+                "upc": {
+                    "type": "string"
+                },
+                "updates": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "upc",
+                "updates"
+            ]
+        },
+        "delete_product": {
+            "type": "object",
+            "properties": {
+                "upc": {
+                    "type": "string"
+                },
+                "project_name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "upc",
+                "project_name"
+            ]
+        },
+        "get_template": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "edit_template": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "updates": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "name",
+                "updates"
+            ]
+        },
+        "delete_template": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "export_csv": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "id_field": {
+                    "type": "string"
+                },
+                "collection": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id",
+                "id_field",
+                "collection"
+            ]
+        },
+        "get_category": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "edit_category": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "updates": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "name",
+                "updates"
+            ]
+        },
+        "delete_category": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "get_user": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "username"
+            ]
+        },
+        "edit_user": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                },
+                "updates": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "username",
+                "updates"
+            ]
+        },
+        "delete_user": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "username"
+            ]
+        }
+    },
+    "collections": {
+        "projects": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": ["name", "products"]
+        },
+        "products": {
+            "type": "object",
+            "properties": {
+                "upc": {
+                    "type": "string"
+                },
+                "drc_upc": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "object",
+                    "properties": {
+                        "num": {
+                            "type": "integer"
+                        },
+                        "unit": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "amount": {
+                    "type": "object",
+                    "properties": {
+                        "measurement": {
+                            "type": "integer"
+                        },
+                        "unit": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "template_name": {
+                    "type": "string"
+                },
+                "width": {
+                    "type": "number"
+                },
+                "height": {
+                    "type": "number"
+                },
+                "depth": {
+                    "type": "number"
+                },
+                "add_height": {
+                    "type": "number"
+                },
+                "add_info": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "upc",
+                "name",
+                "amount",
+                "template_name",
+                "width",
+                "height",
+                "depth",
+                "add_info"
+            ]
+        },
+        "templates": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "workflow": {
+                    "type": "string"
+                },
+                "donor_shape": {
+                    "type": "string"
+                },
+                "product_upc": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "form_desc": {
+                    "type": "string"
+                },
+                "gltf": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "type",
+                "workflow",
+                "donor_shape",
+                "product_upc",
+                "notes",
+                "form_desc",
+                "gltf"
+            ]
+        },
+        "categories": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "definition": {
+                    "type": "string"
+                },
+                "templates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "definition",
+                "templates"
+            ]
+        },
+        "users": {
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "username"
+            ]
+        }
+    }
+}
