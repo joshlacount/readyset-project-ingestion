@@ -74,10 +74,10 @@ class DBClient:
         try:
             self.client.admin.command('ping')
             return True
-        except pmerrors.ServerSelectionError:
-            print('Unable to find MongoDB server.  Check address.')
+        except pmerrors.ServerSelectionTimeoutError:
+            print('Unable to connect to MongoDB server')
         except pmerrors.PyMongoError as e:
-            print(f'Error connecting to MongoDB server - {e.message}')
+            print(f'Error connecting to MongoDB server - {e}')
         return False
 
     def is_duplicate(self, collection, query, existing=False):
@@ -112,7 +112,7 @@ class DBClient:
         try:
             result = collection.insert_one(doc)
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e
+            raise errors.DatabaseError() from e
         return self._get(collection, {'_id': result.inserted_id})[0]
 
     def _get(self, collection, query=None, projection=None):
@@ -132,7 +132,7 @@ class DBClient:
         try:
             result = collection.find(query, projection)
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e 
+            raise errors.DatabaseError() from e 
         return list(result)
 
     def _update(self, collection, query, update):
@@ -148,7 +148,7 @@ class DBClient:
         try:
             result = collection.update_many(query, update)    
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e
+            raise errors.DatabaseError() from e
         return (self._get(collection, query)
                 if result.modified_count > 0 else None)
 
@@ -164,7 +164,7 @@ class DBClient:
         try:
             return collection.delete_many(query).deleted_count > 0
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e
+            raise errors.DatabaseError() from e
 
     def templates_delete(self, query):
         """Deletes templates according to query.
@@ -230,7 +230,7 @@ class DBClient:
                 {'_id': 0, 'password': 0}
             )
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e
+            raise errors.DatabaseError() from e
 
     def users_get(self, query=None, projection=None, include_password=False):
         """Get users.
@@ -254,7 +254,7 @@ class DBClient:
         try:
             return list(self.users.find(query, projection))
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e
+            raise errors.DatabaseError() from e
 
     def users_update(self, query, update):
         """Update user.
@@ -273,4 +273,4 @@ class DBClient:
             return (self.users.find(query, {'_id': 0, 'password': 0})
                     if result.modified_count > 0 else None)
         except pmerrors.PyMongoError as e:
-            raise errors.DatabaseError(e.message) from e
+            raise errors.DatabaseError() from e

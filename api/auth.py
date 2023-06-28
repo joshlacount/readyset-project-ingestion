@@ -1,6 +1,7 @@
 """Functions for user authentication."""
 
 import bcrypt
+import errors
 
 def hash_password(password):
     """Salts and hashes password.
@@ -11,7 +12,10 @@ def hash_password(password):
     Returns:
       Hashed password.
     """
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    try:
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    except ValueError as e:
+        raise errors.HashError() from e
 
 def verify_password(guessed_password, hashed_password):
     """Verifies if a plain-text password matches a hashed password.
@@ -23,4 +27,7 @@ def verify_password(guessed_password, hashed_password):
     Returns:
       True if match otherwise False
     """
-    return bcrypt.checkpw(guessed_password.encode('utf-8'), hashed_password)
+    try:
+        return bcrypt.checkpw(guessed_password.encode('utf-8'), hashed_password)
+    except (ValueError, TypeError) as e:
+        raise errors.HashError() from e

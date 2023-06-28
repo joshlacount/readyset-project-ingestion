@@ -40,7 +40,7 @@ def export_project(project, db_client):
     products += drc
 
     df = pd.DataFrame(products)
-    return df.to_csv(index=False)
+    return df.to_csv(index=False, errors='backslashreplace')
 
 def export_category(category, db_client):
     """Export category to CSV.
@@ -56,4 +56,4 @@ def export_category(category, db_client):
         {'name': {'$in': category['templates']}}
     )
     df = pd.DataFrame(templates)
-    return df.to_csv(index=False)
+    return df.to_csv(index=False, errors='backslashreplace')
