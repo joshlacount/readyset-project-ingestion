@@ -10,14 +10,6 @@ import export
 import auth
 import errors
 
-# Init the Dependencies and API, the code is kinda messy up here.
-#
-# The main API codebase starts after login function and is much easier to read.
-#
-# The DOCString Comments are an idea for what the functions will end up doing
-# (some are not fully flushed yet because of ambiguity).
-#
-
 with open(os.environ.get('SCHEMA_PATH'), 'r') as f:
     schema = json.load(f)
 
@@ -33,35 +25,22 @@ db_auth_source = os.environ.get('DB_AUTH_SOURCE')
 db_client = db.DBClient(db_address, db_port, db_username, db_password,
                         db_auth_source)
 
-#Test Route for Environment Variables
-@app.route('/debug', methods=['GET'])
-@flask_jwt_extended.jwt_required()
-def debug():
-    serializable_env = {k: v for k, v in os.environ.items()
-                        if isinstance(v, str)}
-    return flask.jsonify(serializable_env), 200
-
-#Test Environment Variable
-@app.route('/envars', methods=['GET'])
-@flask_jwt_extended.jwt_required()
-def envars():
-    return flask.jsonify(message=os.environ.get('TEST_VARIABLE')), 200
-
-#Basic Test API Endpoint to ensure it is up and running
 @app.route('/foo', methods=['GET'])
 def foo():
+    """Test connection.
+
+    Returns:
+      Connection success message.
+    """
     return flask.jsonify(message='Connection to API Seccessful'), 200
 
-# Base Login endpoint
 @app.route('/login', methods=['POST'])
 def login():
     """
-    Login to the API with credential provided in the websites Login Page.
+    Login to the API.
 
-    If Invalid credentials are provided this function will reject the login
-
-    Otherwise it will return a new valid JWT access token inside of a JSON
-    object 
+    Returns:
+      Access token if authentication successful.  Otherwise, error message.
     """
     username = flask.request.json.get('username', None)
     password = flask.request.json.get('password', None)
@@ -94,23 +73,20 @@ def login():
 @app.route('/testjwt', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def test_jwt():
-    return flask.jsonify('success'), 200
+    """Test authentication.
 
-##### Projects API Endpoints #####
+    Returns:
+      Success message.
+    """
+    return flask.jsonify(message='success'), 200
 
 @app.route('/projects/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def get_project():
-    """Base Function to Retrieve the Project from the MongoDB database using
-    the project name as an ID
+    """Get project from database.
 
-    Parameter
-    ---------
-    project_name : str
-
-    Returns
-    ---------
-    Project : JSON Object
+    Returns:
+      Project or error message.
     """
 
     json = flask.request.get_json()
@@ -128,10 +104,14 @@ def get_project():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error='Project not found'), 404
 
-# Protected API endpoint, List all Projects
 @app.route('/projects/all', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def list_projects():
+    """Get all projects from database.
+
+    Returns:
+      Array of projects or error message.
+    """
     result = None
     def run():
         nonlocal result
@@ -140,20 +120,13 @@ def list_projects():
         return flask.jsonify(error=err), 500
     return flask.jsonify(result), 200
 
-# Create new Project Protected API endpoint
 @app.route('/projects/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
 def add_project():
-    """
-    Function to add a blank project to the database.
-    Parameter
-    ---------
-    Takes in a JSON object formatted as a project as a parameter,
-    requires a name
+    """Add project to database.
 
-    Returns
-    ---------
-    Project : JSON object
+    Returns:
+      Added project or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['collections']['projects']):
@@ -179,21 +152,13 @@ def add_project():
         return flask.jsonify(error=err), 500
     return flask.jsonify(project), 200
 
-# Edit existing Project Protected API endpoint
 @app.route('/projects/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
 def edit_project():
-    """
-    Function to edit an existing project in the database.
+    """Edit project in database.
 
-    Parameters
-    ---------
-    project_name : str
-
-    Returns
-    ---------
-    Project : JSON object
-    (Will return None if nothing updated, or project not found by name)
+    Returns:
+      Edited project or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['edit_project']):
@@ -211,19 +176,13 @@ def edit_project():
     result = result[0] if result is not None else result
     return flask.jsonify(result)
 
-# Delete existing Project Protected API endpoint
 @app.route('/projects/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
 def delete_project():
-    """
-    Function to delete an existing project in the database.
+    """Delete project from database.
 
-    Parameters:
-    project_name : str
-    
-    Returns
-    ---------
-    data : JSON object
+    Returns:
+      Success or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['delete_project']):
@@ -239,22 +198,13 @@ def delete_project():
         return flask.jsonify(message='Delete Sucessful'), 200 
     return flask.jsonify(message='Project not found'), 404
 
-##### Products API Endpoints #####
-
-# Retrieve product Protected API endpoint
 @app.route('/products/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def get_product():
-    """Function to Retrieve the product from the MongoDB database using the
-    product name as an ID
+    """Get product from database.
 
-    Parameter
-    ---------
-    product_name : str
-
-    Returns
-    ---------
-    Product : JSON Object
+    Returns:
+      Product or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['get_product']):
@@ -271,20 +221,13 @@ def get_product():
         return flask.jsonify(products[0]), 200
     return flask.jsonify(error='Product not found'), 404
 
-# Create new Product Protected API endpoint
 @app.route('/products/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
 def add_product():
-    """Function to add a new product linked to a specified project
+    """Add product to project and database.
 
-    Parameter
-    ---------
-    Takes in a Product JSON through the request
-    And project_name (str) through the URL
-
-    Returns
-    ---------
-    Project : JSON Object
+    Returns:
+      Added product or error message.
     """
     json = flask.request.get_json()
     if ((err := errors.validate_json(json, schema['endpoints']['add_product']))
@@ -307,20 +250,13 @@ def add_product():
         return flask.jsonify(product), 200
     return flask.jsonify(error='Project not found'), 404
 
-# Edit existing Product Protected API endpoint
 @app.route('/products/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
 def edit_product():
-    """Function to edit a product based of the product name
+    """Edit product in database.
 
-    Parameter
-    ---------
-    product_name : str
-    also takes in a json of updates
-
-    Returns
-    ---------
-    Product : JSON Object
+    Returns:
+      Edited product or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['edit_product']):
@@ -347,23 +283,13 @@ def edit_product():
     result = result[0] if result else product
     return flask.jsonify(result), 200
 
-# Delete existing Product Protexted API endpoint
 @app.route('/products/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
 def delete_product():
-    """Function to delete a product based of the products UPC
+    """Delete product from project.
 
-    Parameter
-    ---------
-    json object with the format:
-    {
-        "product_upc" : string
-        "project_name" : string
-    }
-
-    Returns
-    ---------
-    data : JSON Object
+    Returns:
+      Success or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['delete_product']):
@@ -390,21 +316,13 @@ def delete_product():
         return flask.jsonify(message='Product deleted'), 200
     return flask.jsonify(error='Product not found'), 404
 
-##### Templates API Endpoints #####
-
-# Retrieve Template Protected API endpoint
 @app.route('/templates/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def get_template():
-    """Function to fetch template data based on the unique template name
+    """Get template from database.
 
-    Parameter
-    ---------
-    template_name : str
-
-    Returns
-    ---------
-    template : JSON Object
+    Returns:
+      Template or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['get_template']):
@@ -420,19 +338,13 @@ def get_template():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error='Template not found'), 404
 
-# Create new Template Protected API endpoint
 @app.route('/templates/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
 def add_template():
-    """Function to add a new blank template based on a template name
+    """Add template to database.
 
-    Parameter
-    ---------
-    Takes in a json of structure template (Structure in the docs page)
-
-    Returns
-    ---------
-    Template:  JSON Object
+    Returns:
+      Added template or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['collections']['templates']):
@@ -446,18 +358,13 @@ def add_template():
         return flask.jsonify(error=err), 500
     return flask.jsonify(result), 200
 
-# Edit existing Template Protected API endpoint
 @app.route('/templates/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
 def edit_template():
-    """Function to edit an existing template using the unique template name
-    Parameter
-    ---------
-    Takes in a json a json template structure
+    """Edit template in database.
 
-    Returns
-    ---------
-    template : JSON Object
+    Returns:
+      Edited template or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['edit_template']):
@@ -476,19 +383,13 @@ def edit_template():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error='Template not found'), 404
 
-# Delete existing Template Protected API endpoint
 @app.route('/templates/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
 def delete_template():
-    """Function to delete an existing template using the unique template name
+    """Delete template from database.
 
-    Parameter
-    ---------
-    template_name : str
-
-    Returns
-    ---------
-    message : JSON Object
+    Returns:
+      Success or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['delete_template']):
@@ -504,21 +405,13 @@ def delete_template():
         return flask.jsonify(message='Delete Sucessful'), 200
     return flask.jsonify(error='Template not found'), 404
 
-##### Export API Endpoints #####
-
-# Export document to CSV Protected API endpoint
 @app.route('/export', methods = ['GET'])
 @flask_jwt_extended.jwt_required()
 def export_csv():
-    """Function to export a document from a collection based on a unique ID
+    """Export document to csv.
 
-    Paramter
-    --------
-    collection : str
-
-    Returns
-    --------
-    csv : Response
+    Returns:
+      CSV or error message.
     """
 
     json = flask.request.get_json()
@@ -557,22 +450,13 @@ def export_csv():
         }
     )
 
-##### Category API Endpoints #####
-
-# Protected API endpoint for, Get Category
 @app.route('/categories/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def get_category():
-    """Base Function to Retrieve the Category from the MongoDB database using
-    the category name as an ID
+    """Get category from database.
 
-    Parameter
-    ---------
-    category_name : str
-
-    Returns
-    ---------
-    Category : JSON Object
+    Returns:
+      Category or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['get_category']):
@@ -588,10 +472,14 @@ def get_category():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error='Category not found'), 404
 
-# Protected API endpoint, List all Categories
 @app.route('/categories/all', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def list_categories():
+    """Get all categories from database.
+
+    Returns:
+      Array of categories or error message.
+    """
     result = None
     def run():
         nonlocal result
@@ -600,20 +488,13 @@ def list_categories():
         return flask.jsonify(error=err), 500
     return flask.jsonify(result), 200
 
-# Create new Category Protected API endpoint
 @app.route('/categories/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
 def add_category():
-    """
-    Function to add a new category to the database.
-    Parameter
-    ---------
-    Takes in a JSON object formatted as a category as a parameter, requires a
-    name
+    """Add category to database.
 
-    Returns
-    ---------
-    Category : JSON object
+    Returns:
+      Added category or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['collections']['categories']):
@@ -627,21 +508,13 @@ def add_category():
         return flask.jsonify(error=err), 500
     return flask.jsonify(result), 200
 
-# Edit existing Category Protected API endpoint
 @app.route('/categories/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
 def edit_category():
-    """
-    Function to edit an existing category in the database.
+    """Edit category in database.
 
-    Parameters
-    ---------
-    category_name : str
-
-    Returns
-    ---------
-    Category : JSON object
-    (Will return false if nothing updated, or category not found by name)
+    Returns:
+      Edited category or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['edit_category']):
@@ -660,19 +533,13 @@ def edit_category():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error='Category not found'), 404
 
-# Delete existing Category Protected API endpoint
 @app.route('/categories/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
 def delete_category():
-    """
-    Function to delete an existing category in the database.
+    """Delete category from database.
 
-    Parameters:
-    category_name : str
-    
-    Returns
-    ---------
-    data : JSON object
+    Returns:
+      Success or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['delete_category']):
@@ -688,22 +555,13 @@ def delete_category():
         return flask.jsonify(data='Delete Sucessful'), 200
     return flask.jsonify(error='Category not found'), 404
 
-##### User API Endpoints #####
-
-# Protected API endpoint for, Get User
 @app.route('/users/get', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def get_user():
-    """Base Function to Retrieve the User from the MongoDB database using the
-    username as an ID
+    """Get user from database.
 
-    Parameter
-    ---------
-    username : str
-
-    Returns
-    ---------
-    User : JSON Object
+    Returns:
+      User or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['get_user']):
@@ -719,10 +577,14 @@ def get_user():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error=f'User not found'), 404
 
-# Protected API endpoint, List all Users
 @app.route('/users/all', methods=['GET'])
 @flask_jwt_extended.jwt_required()
 def list_users():
+    """Get all users from database.
+
+    Returns:
+      Array of users or error message.
+    """
     result = None
     def run():
         nonlocal result
@@ -731,20 +593,13 @@ def list_users():
         return flask.jsonify(error=err), 500
     return flask.jsonify(result), 200
 
-# Create new User Protected API endpoint
 @app.route('/users/add', methods = ['POST'])
 @flask_jwt_extended.jwt_required()
 def add_user():
-    """
-    Function to add a new user to the database.
-    Parameter
-    ---------
-    Takes in a JSON object formatted as a user as a parameter, requires a
-    username and password
+    """Add user to database.
 
-    Returns
-    ---------
-    User : JSON object
+    Returns:
+      Added user or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['collections']['users']):
@@ -764,21 +619,13 @@ def add_user():
         return flask.jsonify(error=err), 500
     return flask.jsonify(result), 200
 
-# Edit existing User Protected API endpoint
 @app.route('/users/edit', methods = ['PUT'])
 @flask_jwt_extended.jwt_required()
 def edit_user():
-    """
-    Function to edit an existing user in the database.
+    """Edit user in database.
 
-    Parameters
-    ---------
-    username : str
-
-    Returns
-    ---------
-    User : JSON object
-    (Will return false if nothing updated, or user not found by username)
+    Returns:
+      Edited user or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['edit_user']):
@@ -805,19 +652,13 @@ def edit_user():
         return flask.jsonify(result[0]), 200
     return flask.jsonify(error='User not found'), 404
 
-# Delete existing User Protected API endpoint
 @app.route('/users/delete', methods = ['DELETE'])
 @flask_jwt_extended.jwt_required()
 def delete_user():
-    """
-    Function to delete an existing user in the database.
+    """Delete user from database.
 
-    Parameters:
-    username : str
-    
-    Returns
-    ---------
-    data : JSON object
+    Returns:
+      Success or error message.
     """
     json = flask.request.get_json()
     if err := errors.validate_json(json, schema['endpoints']['delete_user']):
