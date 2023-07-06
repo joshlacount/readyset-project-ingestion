@@ -80,24 +80,21 @@ class DBClient:
             print(f'Error connecting to MongoDB server - {e}')
         return False
 
-    def is_duplicate(self, collection, query, existing=False):
-        """Checks if document with id is a duplicate.
+    def doc_exists(self, collection, query):
+        """Checks if a document already exists
 
         Args:
           col_name: Collection name.
-          query: Query to run to find duplicates.
-          existing: If True check for duplicates amongst existing documents.
-            Else check for would be duplicate.
+          query: Query to run to find existing document.
 
         Returns:
-          True if duplicates detected otherwise False.
+          True if existing document found, False otherwise.
         """
         try:
             result = collection.find(query)
         except pmerrors.PyMongoError as e:
             raise errors.DatabaseError(e.message) from e
-        n = len(list(result))
-        return n > 1 if existing else n > 0
+        return bool(list(result))
 
     def _add(self, collection, doc):
         """Adds new document to a collection.
@@ -105,15 +102,11 @@ class DBClient:
         Args:
           collection: Reference to collection to add document to.
           doc: Dict of new document.
-
-        Returns:
-          The inserted document.
         """
         try:
-            result = collection.insert_one(doc)
+            collection.insert_one(doc)
         except pmerrors.PyMongoError as e:
             raise errors.DatabaseError() from e
-        return self._get(collection, {'_id': result.inserted_id})[0]
 
     def _get(self, collection, query=None, projection=None):
         """Gets documents according to query.
@@ -141,28 +134,20 @@ class DBClient:
         Args:
           query: Query for document selection.
           update: Update to apply.
-
-        Returns:
-          List of updated documents.  None if no documents updated.
         """
         try:
-            result = collection.update_many(query, update)    
+            collection.update_many(query, update)    
         except pmerrors.PyMongoError as e:
             raise errors.DatabaseError() from e
-        return (self._get(collection, query)
-                if result.modified_count > 0 else None)
 
     def _delete(self, collection, query):
         """Deletes documents according to query.
 
         Args:
           query: Query for document selection.
-        
-        Returns:
-          True if deleted count > 0 otherwise False.
         """
         try:
-            return collection.delete_many(query).deleted_count > 0
+            collection.delete_many(query)
         except pmerrors.PyMongoError as e:
             raise errors.DatabaseError() from e
 
@@ -174,9 +159,6 @@ class DBClient:
 
         Args:
           query: Query for document selection.
-        
-        Returns:
-          True if deleted count > 0 otherwise False.
         """
         to_be_deleted = [template['name'] for template in
                          self.templates_get(query, {'name': 1})]
@@ -188,7 +170,7 @@ class DBClient:
             {'template_name': {'$in': to_be_deleted}},
             {'$set': {'template_name': ''}}
         )
-        return self._delete(self.templates, query)
+        self._delete(self.templates, query)
 
     def categories_delete(self, query):
         """Deletes categories according to query.
@@ -198,9 +180,6 @@ class DBClient:
 
         Args:
           query: Query for document selection.
-        
-        Returns:
-          True if deleted count > 0 otherwise False.
         """
         templates = list(itertools.chain(
             *[category['templates'] for category in
@@ -210,7 +189,7 @@ class DBClient:
             {'name': 'Default'},
             {'$push': {'templates': {'$each': templates}}}
         )
-        return self._delete(self.categories, query)
+        self._delete(self.categories, query)
 
     def users_add(self, user):
         """Add new user.
@@ -219,16 +198,9 @@ class DBClient:
 
         Args:
           user: Dict for new user
-
-        Returns:
-          The inserted user document.
         """
         try:
-            result = self.users.insert_one(user)
-            return self.users.find_one(
-                {'_id': result.inserted_id},
-                {'_id': 0, 'password': 0}
-            )
+            self.users.insert_one(user)
         except pmerrors.PyMongoError as e:
             raise errors.DatabaseError() from e
 
@@ -264,13 +236,8 @@ class DBClient:
         Args:
           query: Query for document selection.
           update: Update to apply.
-
-        Returns:
-          List of updated documents.  None if no documents updated.
         """
         try:
-            result = self.users.update_many(query, update)
-            return (self.users.find(query, {'_id': 0, 'password': 0})
-                    if result.modified_count > 0 else None)
+            self.users.update_many(query, update)
         except pmerrors.PyMongoError as e:
             raise errors.DatabaseError() from e
