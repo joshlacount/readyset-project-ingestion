@@ -39,18 +39,17 @@ export const EditTemplate = (props) => {
         updated_data = data;
         updated_data.push(name);
         var requestOptions = {
-            method: "PUT",
+            method: "PATCH",
             headers: {
                 "Authorization":token,
                 "Content-Type":"application/json"
             },
             body: JSON.stringify({
-                name:cat.current_category,
-                templates:updated_data
+                templates: updated_data
             }),
             redirect: "follow"
         }
-        fetch("api/categories/edit/" + cat.current_category, requestOptions)
+        fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(cat.current_category), requestOptions)
         .then(response => response.json())
         .then(data => console.log(data))
         
@@ -79,7 +78,7 @@ export const EditTemplate = (props) => {
                 }),
                 redirect: "follow"
              }
-            return fetch(process.env.API_BASE_URL+"/api/templates/add", requestOptions)
+            return fetch(process.env.API_BASE_URL+"/templates", requestOptions)
                 .then(response => response.json())
                 .then(data => {
                     console.log("finished adding");
@@ -92,7 +91,7 @@ export const EditTemplate = (props) => {
         const obj = JSON.parse(localStorage.getItem("access_token"));
         const token = "Bearer " + obj.access_token;
               var requestOptions = {
-                method: "PUT",
+                method: "PATCH",
                 headers: {
                     "Authorization":token,
                     "Content-Type":"application/json"
@@ -109,7 +108,7 @@ export const EditTemplate = (props) => {
                 }),
                 redirect: "follow"
               }
-            fetch(process.env.API_BASE_URL+"/api/templates/edit/" + props.stateVars, requestOptions)
+            fetch(process.env.API_BASE_URL+"/templates/"+encodeURIComponent(props.stateVars), requestOptions)
                 .then(response => {response.json()})
                 .then(data => {console.log(data)})
     }
@@ -133,14 +132,14 @@ export const EditTemplate = (props) => {
         var requestOptions = {
             method: "GET",
             headers: {
-                "Authorization":token,
+                "Authorization":token
             },
             redirect: "follow"
         };
         if(props.stateVars === "Untitled") {
             clearRecord(); 
         } else {
-            const str = process.env.API_BASE_URL+'/api/templates/get/' + props.stateVars;
+            const str = process.env.API_BASE_URL+'/templates/'+encodeURIComponent(props.stateVars);
             fetch(str, requestOptions)
               .then(response => response.json())
               .then(fetchData => {
@@ -170,12 +169,12 @@ export const EditTemplate = (props) => {
         var requestOptions = {
             method: "GET",
             headers: {
-                "Authorization":token,
+                "Authorization":token
             },
             redirect: "follow"  
         }
         
-        fetch(process.env.API_BASE_URL+"/api/categories/get/" + cat.current_category, requestOptions)
+        fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(cat.current_category), requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     setData(fetchData.templates);

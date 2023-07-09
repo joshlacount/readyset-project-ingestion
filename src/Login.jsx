@@ -27,7 +27,7 @@ export const Login = (props) => {
         redirect: 'follow'
       };
       var result_text = "";
-      fetch(process.env.API_BASE_URL+"/api/login", requestOptions)
+      fetch(process.env.API_BASE_URL+"/login", requestOptions)
       .then(response => response.text())
       .then(result => {
         if(result.includes("error")) {

@@ -18,7 +18,7 @@ export const Category = (props) => {
             redirect: "follow"   
         };
                 
-        fetch(process.env.API_BASE_URL+"/api/categories/all", requestOptions)
+        fetch(process.env.API_BASE_URL+"/categories", requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -40,13 +40,15 @@ export const Category = (props) => {
         const obj = JSON.parse(localStorage.getItem("access_token"));
         const token = "Bearer " + obj.access_token;
         var requestOptions = {
-                method: "DELETE",
-                headers: {"Authorization":token},
-                redirect: "follow"
-             }
-            fetch(process.env.API_BASE_URL+"/api/categories/delete/"+categoryName, requestOptions)
-                .then(response => response.json())
-                .then(data => console.log(data))
+            method: "DELETE",
+            headers: {
+                "Authorization": token
+            },
+            redirect: "follow"
+        };
+        fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(categoryName), requestOptions)
+            .then(response => response.json())
+            .then(data => console.log(data));
         render();
         props.onSwitch("Category",'',theme)
     }

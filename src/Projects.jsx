@@ -18,7 +18,7 @@ export const Projects = (props) => {
             redirect: "follow"   
         };
                 
-        fetch(process.env.API_BASE_URL+"/api/projects/all", requestOptions)
+        fetch(process.env.API_BASE_URL+"/projects", requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -45,22 +45,16 @@ export const Projects = (props) => {
     const deleteButton = (item) => {        
         const obj = JSON.parse(localStorage.getItem('access_token'));
         const token = "Bearer " + obj.access_token;
-        
-        var raw = JSON.stringify({
-            "name":item.name
-        });
-        
+ 
         var requestOptions = {
             method: 'DELETE',
             headers: {
-                "Content-Type":"application/json",
                 "Authorization":token
             },
-            body: raw,
             redirect:"follow"
         };
                 
-        fetch(process.env.API_BASE_URL+'/api/projects/delete', requestOptions)
+        fetch(process.env.API_BASE_URL+'/projects/'+encodeURIComponent(item.name), requestOptions)
           .then(response => {
             console.log(response);
             render();

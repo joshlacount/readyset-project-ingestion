@@ -11,14 +11,15 @@ export const EditProject = (props) => {
         const token = "Bearer " + obj.access_token;
         var requestOptions = {
             method: "GET",
-            headers: {"Authorization":token},
+            headers: {
+                "Authorization":token},
             redirect: "follow"
         };
         if(props.stateVars === "Untitled") {
             localStorage.setItem("current_project", JSON.stringify({"current_project":"new project"}));
             console.log("Creating new project");
         } else {
-            const str = process.env.API_BASE_URL+'/api/projects/get/' + props.stateVars;
+            const str = process.env.API_BASE_URL+'/projects/'+encodeURIComponent(props.stateVars);
             const temp = "{\"current_project\":\"" + props.stateVars + "\"}";
             console.log(temp);
             localStorage.setItem("current_project", temp);
@@ -51,7 +52,7 @@ export const EditProject = (props) => {
         const obj = JSON.parse(localStorage.getItem("access_token"));
         const token = "Bearer " + obj.access_token;
   
-        fetch(process.env.API_BASE_URL+'/api/projects/add', {
+        fetch(process.env.API_BASE_URL+'/projects', {
           method: 'POST',
           headers: {
             'Authorization': token,
@@ -88,16 +89,11 @@ export const EditProject = (props) => {
         var requestOptions = {
             method: "DELETE",
             headers: {
-                "Authorization": token,
-                "Content-Type":"application/json"
+                "Authorization": token
             },
-            body: JSON.stringify({
-                "product_upc" : recordName,
-                "project_name" : props.stateVars
-            }),
             redirect: "follow"
         }
-        fetch(process.env.API_BASE_URL+'/api/products/delete', requestOptions)
+        fetch(process.env.API_BASE_URL+'/products/'+encodeURIComponent(recordName), requestOptions)
           .then(response => {
             if (!response.ok) {
               throw new Error('Network response was not ok');
@@ -120,11 +116,11 @@ export const EditProject = (props) => {
         var requestOptions = {
             method:"GET",
             headers: {
-                "Authorization":token   
+                "Authorization": token
             },
             redirect:"follow"
         }
-        fetch(process.env.API_BASE_URL+"/api/export/projects?id=" + props.stateVars + "&id_field=name", requestOptions)
+        fetch(process.env.API_BASE_URL+"/projects/"+encodeURIComponent(props.stateVars)+"/csv", requestOptions)
             .then(response => {response.json()})
             .then(data => {console.log(data)})
         console.log("Export Project");

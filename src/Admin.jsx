@@ -18,7 +18,7 @@ export const Admin = (props) => {
             redirect: "follow"   
         };
                 
-        fetch(process.env.API_BASE_URL+"/api/users/all", requestOptions)
+        fetch(process.env.API_BASE_URL+"/users", requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -54,21 +54,15 @@ export const Admin = (props) => {
         const obj = JSON.parse(localStorage.getItem('access_token'));
         const token = "Bearer " + obj.access_token;
         
-        var raw = JSON.stringify({
-            "username":item
-        });
-        
         var requestOptions = {
             method: 'DELETE',
             headers: {
-                "Content-Type":"application/json",
-                "Authorization":token
+                "Authorization": token
             },
-            body: raw,
-            redirect:"follow"
+            redirect: "follow"
         };
                 
-        fetch(process.env.API_BASE_URL+'/api/users/delete/' + item, requestOptions)
+        fetch(process.env.API_BASE_URL+'/users/'+encodeURIComponent(item), requestOptions)
           .then(response => {
             render();
           })

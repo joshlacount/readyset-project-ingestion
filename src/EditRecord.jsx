@@ -45,7 +45,7 @@ export const EditRecord = (props) => {
         if(props.stateVars === "new record") {
             clearRecord(); 
         } else {
-            const str = process.env.API_BASE_URL+'/api/products/get/' + props.stateVars;
+            const str = process.env.API_BASE_URL+'/products/'+encodeURIComponent(props.stateVars);
             fetch(str, requestOptions)
               .then(response => response.json())
               .then(fetchData => {
@@ -69,7 +69,7 @@ export const EditRecord = (props) => {
                         setUpc(fetchData.upc);
                         setWidth(fetchData.width);
                     }
-                    fetch("/api/templates/get/"+fetchData.template_name,requestOptions)
+                    fetch(process.env.API_BASE_URL+"/templates/"+encodeURIComponent(fetchData.template_name), requestOptions)
                         .then(response => response.json())
                         .then(fetchData => {
                             set_donor_shape(fetchData.donor_shape);
@@ -93,34 +93,32 @@ export const EditRecord = (props) => {
         
         const obj = JSON.parse(localStorage.getItem("access_token"));
         const token = "Bearer " + obj.access_token;
-        const cat = "Default";  
-        
+        const cat = JSON.parse(localStorage.getItem("current_category"));
         var requestOptions = {
             method: "GET",
             headers: {
-                "Authorization":token,
+                "Authorization":token
             },
             redirect: "follow"
         };
-        fetch(process.env.API_BASE_URL+"/api/categories/get/" + "Default", requestOptions)
+        fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(cat.current_category), requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     var updated_data = fetchData.templates;
                     console.log(template_name);
                     updated_data.push(template_name);
                     requestOptions = {
-                        method: "PUT",
+                        method: "PATCH",
                         headers: {
-                            "Authorization":token,
-                            "Content-Type":"application/json"
+                            "Content-Type": "application/json",
+                            "Authorization":token
                         },
                         body: JSON.stringify({
-                            name:cat.current_category,
                             templates:updated_data
                         }),
                         redirect: "follow"
                     }
-                    fetch("/api/categories/edit/" + cat, requestOptions)
+                    fetch(procces.env.API_BASE_URL+"/categories/"+encodeURIComponent(cat.current_category), requestOptions)
                     .then(response => response.json())
                     .then(data => console.log(data))   
                 });
@@ -154,19 +152,22 @@ export const EditRecord = (props) => {
         const token = "Bearer " + obj.access_token;
 
         if(props.stateVars === "new record") {
+            const project = JSON.parse(localStorage.getItem("current_project"))
+            const projectName = project.current_project;
             var requestOptions = {
                 method: "POST",
                 headers: {
                     "Authorization":token,
                     'Content-Type':'application/json'
                 },
-                body: JSON.stringify(product),
+                body: JSON.stringify({
+                    project_name: projectName,
+                    product: product
+                }),
                 redirect: "follow"
             };
-            const project = JSON.parse(localStorage.getItem("current_project"))
-            const projectName = project.current_project;
             console.log(projectName);
-            fetch(process.env.API_BASE_URL+'/api/products/add/' + projectName, requestOptions)
+            fetch(process.env.API_BASE_URL+'/products', requestOptions)
             .then(response => {
                 response.json()
             })
@@ -176,7 +177,7 @@ export const EditRecord = (props) => {
         } else {
             console.log(props.stateVars);
             var requestOptions = {
-                method: "PUT",
+                method: "PATCH",
                 headers: {
                     "Authorization":token,
                     'Content-Type':'application/json'
@@ -184,7 +185,7 @@ export const EditRecord = (props) => {
                 body: JSON.stringify(product),
                 redirect: "follow"
             };
-            fetch(process.env.API_BASE_URL+'/api/products/edit/' + upc, requestOptions)
+            fetch(process.env.API_BASE_URL+'/products/'+encodeURIComponent(upc), requestOptions)
                 .then(response => {
                     response.json()
             })
@@ -215,7 +216,7 @@ export const EditRecord = (props) => {
                     }),
                     redirect: "follow"
                  }
-                fetch(process.env.API_BASE_URL+"/api/templates/add", requestOptions)
+                fetch(process.env.API_BASE_URL+"/templates/", requestOptions)
                     .then(response => response.json())
                     .then(data => {
                         console.log("finished adding to db");
