@@ -14,7 +14,9 @@ export const EditUser = (props) => {
         
         var requestOptions = {
             method: "GET",
-            headers: {"Authorization":token},
+            headers: {
+                "Authorization":token
+            },
             redirect: "follow"   
         };
                 
@@ -22,7 +24,7 @@ export const EditUser = (props) => {
         if(props.stateVars === "Untitled") {
           setUsername("Untitled"); 
         } else {
-          fetch(process.env.API_BASE_URL+"/api/users/get/" + props.stateVars, requestOptions)
+          fetch(process.env.API_BASE_URL+"/users/"+encodeURIComponent(props.stateVars), requestOptions)
                   .then(response => response.json())
                   .then(fetchData => {
                       if(mounted) {
@@ -66,7 +68,7 @@ export const EditUser = (props) => {
             redirect: "follow"   
         };
       
-         fetch(process.env.API_BASE_URL+'/api/users/add', requestOptions)
+         fetch(process.env.API_BASE_URL+'/users', requestOptions)
             .then(response => {
                 response.json()
             })

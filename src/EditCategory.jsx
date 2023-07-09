@@ -12,11 +12,10 @@ export const EditCategory = (props) => {
         var mounted = true;
         const obj = JSON.parse(localStorage.getItem("access_token"));
         const token = "Bearer " + obj.access_token;
-        
         var requestOptions = {
             method: "GET",
             headers: {
-                "Authorization":token,
+                "Authorization": token,
             },
             redirect: "follow"   
         };
@@ -29,7 +28,7 @@ export const EditCategory = (props) => {
             const temp = "{\"current_category\":\"" + props.stateVars + "\"}";
             console.log(temp);
             localStorage.setItem("current_category", temp);
-            fetch(process.env.API_BASE_URL+"/api/categories/get/" + props.stateVars, requestOptions)
+            fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(props.stateVars), requestOptions)
                 .then(response => response.json())
                 .then(fetchData => {
                     if(mounted) {
@@ -64,7 +63,7 @@ export const EditCategory = (props) => {
             },
             redirect:"follow"
         }
-        fetch(process.env.API_BASE_URL+"/api/export/categories?id=" + props.stateVars + "&id_field=name", requestOptions)
+        fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(props.stateVars)+"/csv", requestOptions)
             .then(response => {response.json()})
             .then(data => {console.log(data)})
         console.log("Export Category");   
@@ -73,22 +72,15 @@ export const EditCategory = (props) => {
     const deleteTemplate = (templateName) => {
         const obj = JSON.parse(localStorage.getItem('access_token'));
         const token = "Bearer " + obj.access_token;
-        
-        var raw = JSON.stringify({
-            "template_name":templateName
-        });
-        
         var requestOptions = {
             method: 'DELETE',
             headers: {
-                "Content-Type":"application/json",
-                "Authorization":token
+                "Authorization": token
             },
-            body: raw,
-            redirect:"follow"
+            redirect: "follow"
         };
                 
-        fetch(process.env.API_BASE_URL+'/api/templates/delete/' + templateName, requestOptions)
+        fetch(process.env.API_BASE_URL+'/templates/'+encodeURIComponent(templateName), requestOptions)
           .then(response => {
             render();
           })
@@ -110,27 +102,27 @@ export const EditCategory = (props) => {
                 body: JSON.stringify({
                     "name":categoryName,
                     "definition":"",
-                    "templates":""
+                    "templates":[]
                 }),
                 redirect: "follow"
              }
-            fetch(process.env.API_BASE_URL+"/api/categories/add", requestOptions)
+            fetch(process.env.API_BASE_URL+"/categories", requestOptions)
                 .then(response => response.json())
                 .then(data => console.log(data))
         } else {
         /* edit category */
               var requestOptions = {
-                method: "PUT",
+                method: "PATCH",
                 headers: {
                     "Authorization":token,
                     "Content-Type":"application/json"
                 },
                 body: JSON.stringify({
-                    name:categoryName,
+                    name: categoryName
                 }),
                 redirect: "follow"
               }
-            fetch(process.env.API_BASE_URL+"/api/categories/edit/" + props.stateVars, requestOptions)
+            fetch(process.env.API_BASE_URL+"/categories/"+encodeURIComponent(props.stateVars), requestOptions)
                 .then(response => response.json())
                 .then(data => console.log(data))
         }

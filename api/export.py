@@ -12,10 +12,12 @@ def product_convert_nested(product):
     Args:
       product: Original product document.
     """
-    product['count'] = ('' if product['count']['num'] < 0 else
-                        f"{product['count']['num']}{product['count']['unit']}")
-    product['amount'] = (f"{product['amount']['measurement']}" +
-                         {product['amount']['unit']})
+    if 'count' in product:
+        product['count'] = (f"{product['count']['num']}"
+                            f"{product['count']['unit']}")
+    if 'amount' in product:
+        product['amount'] = (f"{product['amount']['measurement']}"
+                             f"{product['amount']['unit']}")
 
 def export_project(project, db_client):
     """Export project to CSV.
@@ -28,10 +30,11 @@ def export_project(project, db_client):
       CSV as a string.
     """
     products = db_client.products_get({'upc': {'$in': project['products']}})
+    print(products)
     drc_upc = []
     for product in products:
         product_convert_nested(product)
-        if product['drc_upc'] != '':
+        if 'drc_upc' in product:
             drc_upc.append(product['drc_upc'])
 
     drc = db_client.products_get({'upc': {'$in': drc_upc}})
@@ -40,7 +43,7 @@ def export_project(project, db_client):
     products += drc
 
     df = pd.DataFrame(products)
-    return df.to_csv(index=False)
+    return df.to_csv(index=False, errors='backslashreplace')
 
 def export_category(category, db_client):
     """Export category to CSV.
@@ -56,4 +59,4 @@ def export_category(category, db_client):
         {'name': {'$in': category['templates']}}
     )
     df = pd.DataFrame(templates)
-    return df.to_csv(index=False)
+    return df.to_csv(index=False, errors='backslashreplace')
